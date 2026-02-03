@@ -1,0 +1,83 @@
+import re
+import html
+
+def parse_logs(filename):
+    with open(filename, 'r', encoding='utf-8', errors='replace') as f:
+        content = f.read()
+
+    # Split by level
+    levels = re.split(r'={30,}\s*STARTING (.*?)\s*={30,}', content)
+    parsed_data = []
+    
+    # Matches[0] is garbage before first level
+    # Matches[1] = Level Name, Matches[2] = Content, Matches[3] = Level Name...
+    
+    for i in range(1, len(levels), 2):
+        level_name = levels[i].strip()
+        raw_text = levels[i+1]
+        
+        chats = []
+        # Find Spammer and Honeypot messages
+        # Pattern: 🔴 SPAMMER: (.*?) | 🟢 HONEYPOT: (.*?)
+        lines = raw_text.split('\n')
+        for line in lines:
+            line = line.strip()
+            if line.startswith("🔴 SPAMMER:"):
+                chats.append({"role": "Spammer", "msg": line.replace("🔴 SPAMMER:", "").strip()})
+            elif line.startswith("🟢 HONEYPOT:"):
+                chats.append({"role": "Honeypot", "msg": line.replace("🟢 HONEYPOT:", "").strip()})
+        
+        parsed_data.append({"title": level_name, "chats": chats})
+        
+    return parsed_data
+
+def generate_html(data):
+    html_content = """
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Agentic Honeypot - Chat Logs</title>
+        <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; }
+            h1 { text-align: center; color: #333; }
+            .container { max-width: 800px; margin: 0 auto; }
+            .level-block { background: white; border-radius: 10px; padding: 20px; margin-bottom: 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+            .level-title { font-size: 1.5em; font-weight: bold; color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
+            .chat-bubble { padding: 10px 15px; border-radius: 15px; margin-bottom: 10px; max-width: 80%; line-height: 1.5; font-size: 14px; position: relative; }
+            .spammer { background-color: #ffebee; color: #c62828; margin-right: auto; border-bottom-left-radius: 2px; }
+            .honeypot { background-color: #e8f5e9; color: #2e7d32; margin-left: auto; border-bottom-right-radius: 2px; text-align: right; }
+            .label { font-size: 10px; font-weight: bold; margin-bottom: 4px; display: block; opacity: 0.7; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🛡️ Agentic Honeypot Simulation Logs</h1>
+    """
+    
+    for level in data:
+        html_content += f'<div class="level-block"><div class="level-title">{html.escape(level["title"])}</div>'
+        for chat in level["chats"]:
+            role_class = "spammer" if chat["role"] == "Spammer" else "honeypot"
+            html_content += f"""
+            <div class="chat-bubble {role_class}">
+                <span class="label">{chat["role"].upper()}</span>
+                {html.escape(chat["msg"])}
+            </div>
+            """
+        html_content += "</div>"
+
+    html_content += """
+        </div>
+    </body>
+    </html>
+    """
+    
+    with open("simulation_chats.html", "w", encoding="utf-8") as f:
+        f.write(html_content)
+    print("✅ Generated simulation_chats.html")
+
+if __name__ == "__main__":
+    data = parse_logs("simulation_log.txt")
+    generate_html(data)
