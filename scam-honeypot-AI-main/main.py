@@ -4,6 +4,7 @@ from typing import Optional, List
 import time
 import re
 import os
+import json
 from groq import Groq
 from dotenv import load_dotenv
 
@@ -130,14 +131,20 @@ async def honey_pot_entry(
         if x_api_key != API_KEY:
             raise HTTPException(status_code=401, detail="Invalid API Key")
 
-        # --- SAFE BODY PARSING (GUVI sends NO body) ---
+        # --- SAFE BODY PARSING (GUVI sends NO body or malformed) ---
         try:
-            body = await request.json()
-        except Exception:
+            # Read raw bytes first - avoids Content-Type header issues
+            raw_body = await request.body()
+            if not raw_body:
+                body = {}
+            else:
+                body = json.loads(raw_body)
+        except Exception as e:
+            print(f"Body parsing error: {e}")
             body = {}
 
-        # Handle case where body might be None (invalid JSON e.g. 'null')
-        if body is None:
+        # Ensure body is a dict (in case json was a list or string)
+        if not isinstance(body, dict):
             body = {}
 
         user_text = body.get("message", "Hello, I received a call regarding my account.")
